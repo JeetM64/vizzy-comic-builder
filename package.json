@@ -1,0 +1,22 @@
+{
+  "name": "vizzy-comic-builder",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A dark studio for planning comic storyboards",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n api,web \"npm run dev --workspace backend\" \"npm run dev --workspace frontend\"",
+    "start": "npm run start --workspace backend",
+    "build": "npm run build --workspace frontend",
+    "test": "npm test --workspace backend"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "@vizzy/frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --configLoader runner",
+    "build": "vite build --configLoader runner",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "devDependencies": {
+    "vite": "^6.2.2"
+  }
+}

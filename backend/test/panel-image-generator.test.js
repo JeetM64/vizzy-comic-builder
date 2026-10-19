@@ -7,6 +7,7 @@ const {
   GEMINI_IMAGE_MODEL,
   buildImagePrompt,
   buildPollinationsImageUrl,
+  generateGeminiImageDataUrl,
   generateImageDataUrl,
   generateImageResult,
   isQuotaError,
@@ -55,6 +56,15 @@ describe('Gemini Nano Banana comic panel generation', () => {
     assert.deepEqual(requests[0].config.responseModalities, ['IMAGE']);
     assert.equal(requests[0].config.imageConfig.aspectRatio, '16:9');
     assert.equal(dataUrl, `data:image/jpeg;base64,${jpeg.toString('base64')}`);
+  });
+
+  it('allows production deployments to select a supported Gemini image model from the environment', async () => {
+    const { ai, requests } = makeAi();
+    await generateGeminiImageDataUrl('A specific comic scene.', {
+      ai,
+      env: { GEMINI_IMAGE_MODEL: 'production-image-model' }
+    });
+    assert.equal(requests[0].model, 'production-image-model');
   });
 
   it('saves actual Gemini image bytes as a generated static asset for the panel API', async () => {

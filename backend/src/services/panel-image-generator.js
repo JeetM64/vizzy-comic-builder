@@ -6,7 +6,7 @@ const { HttpError } = require('../utils/http-error');
 const { VISUAL_STYLES } = require('../config/story-options');
 
 const DEFAULT_IMAGE_DIRECTORY = path.resolve(__dirname, '../../generated');
-const GEMINI_IMAGE_MODEL = 'gemini-2.5-flash-image';
+const GEMINI_IMAGE_MODEL = 'gemini-3.1-flash-image';
 const IMAGE_TIMEOUT_MS = 60000;
 const POLLINATIONS_TIMEOUT_MS = 45000;
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
@@ -84,8 +84,9 @@ async function generateGeminiImageDataUrl(promptText, options = {}) {
     throw new HttpError(400, 'An image prompt is required.', 'IMAGE_PROMPT_REQUIRED');
   }
   const ai = getGeminiClient(options);
+  const env = options.env || process.env;
   const response = await ai.models.generateContent({
-    model: options.model || GEMINI_IMAGE_MODEL,
+    model: options.model || env.GEMINI_IMAGE_MODEL?.trim() || GEMINI_IMAGE_MODEL,
     contents: promptText.trim(),
     config: {
       responseModalities: ['IMAGE'],

@@ -1,48 +1,96 @@
 # Vizzy
 
-Vizzy is a chat-first graphic novel and storyboard studio with an Express/Mongoose API and a Vite frontend. Lock an art direction, set palette and story context, then turn each chat prompt into an ordered sequence of 3–6 illustrated frames. Preview the full sequence as a looping slideshow or export JSON, PNG, and print-ready pages.
+Vizzy is a chat-first graphic novel and storyboard studio. Set a visual direction, palette, and story context, then build a sequence of illustrated frames collaboratively. Preview the sequence as a looping slideshow and export JSON, PNGs, or print-ready pages.
 
-## Requirements and setup
+![Vizzy storyboard studio](docs/assets/vizzy-studio.png)
+
+## Features
+
+- Locked visual styles, palette notes, and character continuity anchors
+- 3–6 ordered story frames generated from one brief
+- Gemini image generation with a 16:9 composition and saved image assets
+- Optional Pollinations FLUX fallback for Gemini outages or quota errors
+- Storyboard canvas, chat history, slideshow controls, and exports
+- Express API with Mongoose persistence and standardized JSON responses
+
+## Requirements
 
 - Node.js 20 or newer
-- MongoDB
-- Gemini API credentials for AI-assisted story dialogue (optional; the scene itself is used directly if Gemini is unavailable)
-- Google Gemini 2.5 Flash Image (Nano Banana) generates comic artwork
+- MongoDB, local or hosted
+- A Gemini API key with image generation access for artwork
+- An optional Pollinations server API key for image fallback
+- An optional Gemini text API key for AI-assisted story breakdowns
+
+## Run locally
 
 From the repository root:
 
-1. Run `npm install`.
-2. Copy `.env.example` to `.env` (or place a local environment file at `backend/.env`).
-3. Set `MONGODB_URI` when MongoDB is not using the local default. If it is absent, Vizzy connects to `mongodb://127.0.0.1:27017/vizzy_db`. Add `?authSource=admin` (or the database where your MongoDB user was created) when needed; Vizzy preserves and passes that setting to Mongoose. MongoDB credentials containing reserved characters must be percent-encoded in the URI; the backend normalizes raw username/password characters such as `@` without logging the URI. Invalid MongoDB URLs produce a clear startup error.
-4. Set `AI_API_KEY`, `AI_BASE_URL`, and `AI_MODEL` to enable Gemini narrative dialogue through its OpenAI-compatible API. The template uses `https://generativelanguage.googleapis.com/v1beta/openai/` and `gemini-2.5-flash`.
-5. Set `GEMINI_API_KEY` to enable image generation with Google's Gemini 2.5 Flash Image model. Keep the key in the backend `.env` file; do not expose it in frontend variables.
-6. Optional: set `POLLINATIONS_API_KEY` to enable the image fallback when Gemini is unavailable or out of quota. Create a server-side key at Pollinations; the fallback uses its current `gen.pollinations.ai` Flux endpoint and sends the key only from the backend. Without this key, image generation still works while Gemini is available, but a Gemini outage/quota error will return a clear configuration error.
-7. Run `npm run dev`, then open the Vite URL shown in the terminal (typically `http://localhost:5173`).
+```sh
+npm install
+```
 
-The API listens on `PORT` (default `4000`). The Vite development server proxies API requests to `localhost:4000`; in production, serve the frontend and proxy `/api` to the backend on the same origin. Never place provider credentials in frontend variables or commit `.env`.
+Copy `.env.example` to `backend/.env`, then set the provider credentials and MongoDB connection string. On Windows PowerShell:
 
-The OpenAI-compatible SDK uses the configured Gemini endpoint to produce structured, sequential story beats with subject-focused illustration prompts. Each frame inherits the locked style, palette notes, story context, and character-continuity notes. Gemini 2.5 Flash Image creates each frame at 16:9. The backend extracts inline image data, validates and writes the actual PNG, JPEG, or WebP bytes to generated assets, and returns static image URLs in the standard JSON response. It does not store large base64 image payloads in MongoDB. If image generation fails, Vizzy returns a structured JSON error instead of persisting placeholder artwork. At startup, Vizzy silently removes exact-name test projects, orphaned/broken panels, chat records for deleted projects, and unreferenced generated image files. If Gemini narrative generation is unavailable or rate-limited, Vizzy still creates a direct 3–6 frame sequence from the story brief.
+```powershell
+Copy-Item .env.example backend/.env
+```
+
+Start both services:
+
+```sh
+npm run dev
+```
+
+Open <http://localhost:5173>. The API listens on port `4000` by default; the Vite dev server proxies `/api`, `/health`, and `/generated` to it.
+
+## Environment variables
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `PORT` | No | Express port; defaults to `4000`. |
+| `MONGODB_URI` | For local MongoDB setup | MongoDB connection string. Defaults to `mongodb://127.0.0.1:27017/vizzy_db`. Add `?authSource=admin` when the MongoDB user is stored in `admin`. |
+| `AI_API_KEY` | No | Gemini API key for story breakdown and dialogue. Without it, Vizzy can still create a direct sequence from the prompt. |
+| `AI_BASE_URL` | No | OpenAI-compatible text endpoint; defaults to Gemini's API endpoint. |
+| `AI_MODEL` | No | Text model; the example uses `gemini-2.5-flash`. |
+| `GEMINI_API_KEY` | For Gemini artwork | Server-side key for Gemini image generation. The key's Google project must have image-generation access and quota. |
+| `GEMINI_IMAGE_MODEL` | No | Image model override; defaults to `gemini-3.1-flash-image`. |
+| `POLLINATIONS_API_KEY` | Optional fallback | Pollinations server key. Required for the Flux fallback; this is a separate credential from `GEMINI_API_KEY`. |
+
+Keep real credentials in `backend/.env`. Never add them to frontend variables or commit local `.env` files. `.env.example` files contain placeholders only.
+
+## Image provider behavior
+
+Artwork generation uses `GEMINI_API_KEY` first, requests a 16:9 image, validates the returned bytes, and saves the image under `backend/generated/`. If Gemini fails, Vizzy tries the current Pollinations Flux endpoint using `POLLINATIONS_API_KEY`. If neither provider is available, the API returns a structured error instead of fabricating placeholder artwork.
+
+Image generation depends on provider access, quota, and billing eligibility. Gemini text generation's free allowance does not imply free image generation. Google's [current pricing](https://ai.google.dev/gemini-api/docs/pricing) lists no free-tier access for Gemini image-generation models; a production key must have an eligible project and active quota. Pollinations also requires its own authenticated server key. Changing keys alone cannot grant a model quota the provider has not enabled.
+
+The image model default is `gemini-3.1-flash-image`. Override it with `GEMINI_IMAGE_MODEL` only when the configured provider supports that model. Gemini 2.5 Flash Image is retired; do not configure it for new deployments.
 
 ## API overview
 
-Successful JSON endpoints return `{ "success": true, "data": ... }`; errors return `{ "success": false, "error": { "message": "...", "code": "..." } }`.
+Successful responses use `{ "success": true, "data": ... }`. Errors use `{ "success": false, "error": { "message": "...", "code": "..." } }`.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/health` | API liveness check |
+| `GET` | `/health` | API and database health |
 | `GET`, `POST` | `/api/projects` | List or create projects |
-| `DELETE` | `/api/projects/reset-all` | Delete every project, panel, chat message, and generated image file |
-| `GET`, `PATCH` | `/api/projects/:id` | Read or update project context, palette notes, name, or status |
-| `POST` | `/api/projects/:id/generate` | Generate 3–6 frames from `{ brief, panelCount }` (optional `tone`; response includes `data.frames`; `panelCount` defaults to 3) |
-| `POST` | `/api/projects/:id/panels/reorder` | Reorder adjacent frames using `{ panelId, direction: "up" \| "down" }` |
-| `GET`, `POST`, `PATCH`, `DELETE` | `/api/panels` and `/api/panels/:id` | Manage panels; list can be filtered with `?projectId=<id>` |
-| `GET` | `/api/chat-histories?projectId=<id>` | Read conversation history for a project |
-| `GET` | `/api/options` | List supported locked art directions |
+| `DELETE` | `/api/projects/reset-all` | Delete projects, panels, chat history, and generated image cache |
+| `GET`, `PATCH` | `/api/projects/:id` | Read or update project context |
+| `POST` | `/api/projects/:id/generate` | Generate an ordered sequence from `{ brief, panelCount }` |
+| `POST` | `/api/projects/:id/panels/reorder` | Reorder storyboard frames |
+| `GET`, `POST`, `PATCH`, `DELETE` | `/api/panels`, `/api/panels/:id` | Manage panels |
+| `GET` | `/api/chat-histories?projectId=<id>` | Read project conversation history |
+| `GET` | `/api/options` | List supported visual styles |
 
-New projects receive a locked visual style and may include palette notes and up to 12 character continuity notes. Generated panels and their chat turn are linked in both the conversation and storyboard. The cinema player supports 2, 4, and 6 second playback, scrubbing, pause/play, fullscreen, JSON export, PNG export, and print-to-PDF.
+## Verification
+
+```sh
+npm test
+npm run build
+```
 
 ## Scripts
 
-- `npm run dev` — start the API and frontend in development mode.
-- `npm run build` — build the frontend production assets.
-- `npm test` — run focused backend API, provider, and model tests.
+- `npm run dev` — start the API and frontend in development mode
+- `npm run build` — build the frontend for production
+- `npm test` — run backend API, provider, model, and startup tests
